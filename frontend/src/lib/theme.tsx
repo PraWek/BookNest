@@ -21,7 +21,7 @@ function getStoredTheme(): AppTheme {
 
 function getStoredStyle(): AppStyle {
   const saved = localStorage.getItem(STYLE_KEY)
-  return saved === 'soft' || saved === 'glass' || saved === 'liquid' || saved === 'minimal' ? saved : 'soft'
+  return saved === 'soft' || saved === 'glass' || saved === 'liquid' || saved === 'minimal' ? saved : 'liquid'
 }
 
 export function AppearanceProvider({ children }: { children: React.ReactNode }) {

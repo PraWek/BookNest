@@ -41,3 +41,15 @@ export type ReaderSettings = {
   textAlign: 'left' | 'justify'
   focusMode: boolean
 }
+
+
+export type TtsVoice = {
+  id: string
+  name: string
+  language: string
+  description: string
+  gender: 'female' | 'male'
+}
+
+export type TtsWordBoundary = { start: number; duration: number; text: string }
+export type TtsNarration = { audio: string; boundaries: TtsWordBoundary[] }

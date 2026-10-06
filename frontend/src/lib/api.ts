@@ -1,4 +1,4 @@
-import type { Bookmark, BookDetail, BookSummary, ReaderSettings } from './types'
+import type { Bookmark, BookDetail, BookSummary, ReaderSettings, TtsVoice, TtsNarration } from './types'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options)
@@ -50,5 +50,26 @@ export const api = {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ settings })
+    }),
+  ttsVoices: () => request<TtsVoice[]>('/api/tts/voices'),
+  ttsNarration: (text: string, voice: string, rate: number, signal?: AbortSignal) =>
+    request<TtsNarration>('/api/tts/narration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice, rate }),
+      signal
+    }),
+  ttsAudio: async (text: string, voice: string, rate: number, signal?: AbortSignal) => {
+    const response = await fetch('/api/tts/speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice, rate }),
+      signal
     })
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      throw new Error(payload?.detail || `Ошибка ${response.status}`)
+    }
+    return response.blob()
+  }
 }

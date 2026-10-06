@@ -66,3 +66,28 @@ class PreferencesIn(BaseModel):
 class PreferencesOut(BaseModel):
     settings: dict
     updated_at: datetime | None = None
+
+
+class TtsSpeechIn(BaseModel):
+    text: str = Field(min_length=1, max_length=3000)
+    voice: str = Field(min_length=1, max_length=120)
+    rate: float = Field(default=1.0, ge=0.7, le=1.35)
+
+
+class TtsVoiceOut(BaseModel):
+    id: str
+    name: str
+    language: str
+    description: str
+    gender: str
+
+
+class TtsWordBoundaryOut(BaseModel):
+    start: float
+    duration: float
+    text: str
+
+
+class TtsNarrationOut(BaseModel):
+    audio: str
+    boundaries: list[TtsWordBoundaryOut]

@@ -3,15 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import unquote, urljoin, urlparse
+import base64
 import ipaddress
 import re
 import socket
 
 import httpx
+import edge_tts
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -30,10 +32,14 @@ from .schemas import (
     ProgressIn,
     ProgressOut,
     UrlImportIn,
+    TtsSpeechIn,
+    TtsVoiceOut,
+    TtsNarrationOut,
+    TtsWordBoundaryOut,
 )
 
 Base.metadata.create_all(bind=engine)
-app = FastAPI(title="BookNest API", version="1.2.0")
+app = FastAPI(title="BookNest API", version="1.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -185,6 +191,73 @@ def _create_book_from_bytes(filename: str, data: bytes, db: Session, encoding_hi
     db.commit()
     db.refresh(book)
     return book
+
+
+TTS_VOICES = [
+    {"id": "ru-RU-SvetlanaNeural", "name": "Светлана", "language": "Русский", "description": "Мягкий, спокойный женский", "gender": "female"},
+    {"id": "ru-RU-DmitryNeural", "name": "Дмитрий", "language": "Русский", "description": "Спокойный, низкий мужской", "gender": "male"},
+    {"id": "en-US-EmmaMultilingualNeural", "name": "Emma", "language": "Мультиязычный", "description": "Живой и естественный женский", "gender": "female"},
+    {"id": "en-US-AvaMultilingualNeural", "name": "Ava", "language": "Мультиязычный", "description": "Выразительный женский", "gender": "female"},
+    {"id": "en-US-AndrewMultilingualNeural", "name": "Andrew", "language": "Мультиязычный", "description": "Естественный мужской", "gender": "male"},
+    {"id": "en-US-BrianMultilingualNeural", "name": "Brian", "language": "Мультиязычный", "description": "Тёплый мужской", "gender": "male"},
+]
+TTS_VOICE_IDS = {voice["id"] for voice in TTS_VOICES}
+
+
+@app.get("/api/tts/voices", response_model=list[TtsVoiceOut])
+def tts_voices():
+    return TTS_VOICES
+
+
+async def synthesize_speech(payload: TtsSpeechIn) -> tuple[bytes, list[TtsWordBoundaryOut]]:
+    if payload.voice not in TTS_VOICE_IDS:
+        raise HTTPException(status_code=400, detail="Неизвестный голос")
+    text = re.sub(r"\s+", " ", payload.text).strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Нет текста для озвучивания")
+
+    percent = round((payload.rate - 1.0) * 100)
+    rate = f"{percent:+d}%"
+    try:
+        communicate = edge_tts.Communicate(text=text, voice=payload.voice, rate=rate, boundary="WordBoundary")
+        audio = bytearray()
+        boundaries = []
+        async for message in communicate.stream():
+            if message["type"] == "audio":
+                audio.extend(message["data"])
+            elif message["type"] == "WordBoundary":
+                # Edge reports offsets and durations in 100-nanosecond ticks.
+                boundaries.append(TtsWordBoundaryOut(
+                    start=message["offset"] / 10_000_000,
+                    duration=message["duration"] / 10_000_000,
+                    text=message["text"],
+                ))
+        if not audio:
+            raise RuntimeError("TTS returned empty audio")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Сервис neural-озвучки временно недоступен") from exc
+
+    return bytes(audio), boundaries
+
+
+@app.post("/api/tts/speech")
+async def tts_speech(payload: TtsSpeechIn):
+    audio, _ = await synthesize_speech(payload)
+    return Response(
+        content=audio,
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.post("/api/tts/narration", response_model=TtsNarrationOut)
+async def tts_narration(payload: TtsSpeechIn):
+    audio, boundaries = await synthesize_speech(payload)
+    return Response(
+        content=TtsNarrationOut(audio=base64.b64encode(audio).decode("ascii"), boundaries=boundaries).model_dump_json(),
+        media_type="application/json",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @app.get("/api/health")

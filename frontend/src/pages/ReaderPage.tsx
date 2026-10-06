@@ -7,6 +7,7 @@ import {
 import ReaderSettingsPanel from '../components/ReaderSettingsPanel'
 import MarkdownChapter from '../components/MarkdownChapter'
 import SpeechPanel from '../components/SpeechPanel'
+import SpeechText from '../components/SpeechText'
 import { api } from '../lib/api'
 import type { Bookmark, BookDetail, ReaderSettings } from '../lib/types'
 import { estimateMinutes, formatDuration, progressPercent, splitParagraphs } from '../lib/text'
@@ -23,6 +24,7 @@ export default function ReaderPage() {
   const id = Number(bookId)
   const navigate = useNavigate()
   const scrollerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLElement>(null)
   const saveTimer = useRef<number | null>(null)
   const restored = useRef(false)
 
@@ -235,17 +237,17 @@ export default function ReaderPage() {
         <button className="side-rail desktop-only" onClick={() => setSideOpen(!sideOpen)} title="Оглавление"><List size={18} /></button>
 
         <main className="reading-scroll" ref={scrollerRef} onScroll={handleScroll}>
-          <article className="reading-page">
+          <article className="reading-page" ref={contentRef}>
             <div className="chapter-kicker">Раздел {chapterIndex + 1}</div>
-            <h1>{chapter.title}</h1>
+            <h1 data-speech-content=""><SpeechText text={chapter.title} /></h1>
             <div className="chapter-meta"><span><Clock3 size={14} /> ~{formatDuration(chapterMinutes)}</span><span>{chapter.text.length.toLocaleString('ru-RU')} знаков</span></div>
-            <div className={`chapter-text align-${settings.textAlign} ${chapter.format === 'markdown' ? 'is-markdown' : 'is-plain'}`}>
+            <div data-speech-content="" className={`chapter-text align-${settings.textAlign} ${chapter.format === 'markdown' ? 'is-markdown' : 'is-plain'}`}>
               {chapter.format === 'markdown' ? (
                 <MarkdownChapter source={chapter.text} />
               ) : (
                 paragraphs.map((paragraph, i) => {
                   const isSubhead = paragraph.length < 90 && (paragraph === paragraph.toUpperCase() || /^(глава|часть|chapter|part)\b/i.test(paragraph))
-                  return isSubhead ? <h2 key={i}>{paragraph}</h2> : <p key={i}>{paragraph}</p>
+                  return isSubhead ? <h2 key={i}><SpeechText text={paragraph} /></h2> : <p key={i}><SpeechText text={paragraph} /></p>
                 })
               )}
             </div>
@@ -262,7 +264,7 @@ export default function ReaderPage() {
       </div>
 
       <ReaderSettingsPanel open={settingsOpen} settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} />
-      <SpeechPanel open={speechOpen} title={chapter.title} text={chapter.text} onClose={() => setSpeechOpen(false)} />
+      <SpeechPanel key={`${id}-${chapterIndex}`} open={speechOpen} title={chapter.title} contentRef={contentRef} onClose={() => setSpeechOpen(false)} />
 
       <nav className="reader-mobile-nav mobile-only">
         <button onClick={() => { setSideTab('contents'); setSideOpen(true) }}><List size={18} /><span>Главы</span></button>
