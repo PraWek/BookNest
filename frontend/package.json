@@ -1,7 +1,7 @@
 {
   "name": "booknest-frontend",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,12 @@
     "lucide-react": ">=0.450 <1",
     "react": ">=18 <20",
     "react-dom": ">=18 <20",
-    "react-router-dom": ">=6 <8"
+    "react-router-dom": ">=6 <8",
+    "react-markdown": ">=9 <11",
+    "remark-gfm": ">=4 <5",
+    "remark-math": ">=6 <7",
+    "rehype-katex": ">=7 <8",
+    "katex": ">=0.16 <1"
   },
   "devDependencies": {
     "@types/react": ">=18 <20",

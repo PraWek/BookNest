@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 type AppTheme = 'system' | 'light' | 'dark'
-type AppStyle = 'soft' | 'glass' | 'minimal'
+type AppStyle = 'soft' | 'glass' | 'liquid' | 'minimal'
 
 type AppearanceContextValue = {
   theme: AppTheme
@@ -21,7 +21,7 @@ function getStoredTheme(): AppTheme {
 
 function getStoredStyle(): AppStyle {
   const saved = localStorage.getItem(STYLE_KEY)
-  return saved === 'soft' || saved === 'glass' || saved === 'minimal' ? saved : 'soft'
+  return saved === 'soft' || saved === 'glass' || saved === 'liquid' || saved === 'minimal' ? saved : 'soft'
 }
 
 export function AppearanceProvider({ children }: { children: React.ReactNode }) {

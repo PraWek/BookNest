@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 class ChapterOut(BaseModel):
     title: str
     text: str
+    format: str = "plain"
 
 
 class ProgressOut(BaseModel):

@@ -17,7 +17,7 @@ export type BookSummary = {
   progress?: Progress | null
 }
 
-export type Chapter = { title: string; text: string }
+export type Chapter = { title: string; text: string; format?: 'plain' | 'markdown' }
 export type BookDetail = BookSummary & { chapters: Chapter[] }
 
 export type Bookmark = {

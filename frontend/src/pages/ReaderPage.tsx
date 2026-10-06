@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Bookmark as BookmarkIcon, ChevronLeft, ChevronRight, Expand, List, Menu,
-  Search, Settings2, Trash2, X, BookOpen, Clock3, Keyboard, Check, PanelLeftClose, Volume2
+  Search, Settings2, Trash2, X, BookOpen, Clock3, Keyboard, Check, PanelLeftClose, Volume2, Minimize2
 } from 'lucide-react'
 import ReaderSettingsPanel from '../components/ReaderSettingsPanel'
+import MarkdownChapter from '../components/MarkdownChapter'
 import SpeechPanel from '../components/SpeechPanel'
 import { api } from '../lib/api'
 import type { Bookmark, BookDetail, ReaderSettings } from '../lib/types'
@@ -114,7 +115,12 @@ export default function ReaderPage() {
       if (e.key.toLowerCase() === 'f') setSettings((s) => ({ ...s, focusMode: !s.focusMode }))
       if (e.key === '+' || e.key === '=') setSettings((s) => ({ ...s, fontSize: Math.min(34, s.fontSize + 1) }))
       if (e.key === '-') setSettings((s) => ({ ...s, fontSize: Math.max(14, s.fontSize - 1) }))
-      if (e.key === 'Escape') { setSettingsOpen(false); setSideOpen(false); setSpeechOpen(false) }
+      if (e.key === 'Escape') {
+        setSettingsOpen(false)
+        setSideOpen(false)
+        setSpeechOpen(false)
+        setSettings((s) => s.focusMode ? { ...s, focusMode: false } : s)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -165,6 +171,12 @@ export default function ReaderPage() {
   return (
     <div className={`reader-shell theme-${settings.theme} font-${settings.fontFamily} ${settings.focusMode ? 'focus-mode' : ''}`} style={readerVars}>
       <div className="reader-progress-top"><i style={{ width: `${overall}%` }} /></div>
+
+      {settings.focusMode && (
+        <button className="focus-exit" onClick={() => setSettings((s) => ({ ...s, focusMode: false }))} title="Выйти из режима фокусировки (F или Esc)">
+          <Minimize2 size={15} /><span>Выйти из фокуса</span><kbd>F</kbd>
+        </button>
+      )}
 
       <header className="reader-topbar">
         <div className="reader-top-left">
@@ -227,11 +239,15 @@ export default function ReaderPage() {
             <div className="chapter-kicker">Раздел {chapterIndex + 1}</div>
             <h1>{chapter.title}</h1>
             <div className="chapter-meta"><span><Clock3 size={14} /> ~{formatDuration(chapterMinutes)}</span><span>{chapter.text.length.toLocaleString('ru-RU')} знаков</span></div>
-            <div className={`chapter-text align-${settings.textAlign}`}>
-              {paragraphs.map((paragraph, i) => {
-                const isSubhead = paragraph.length < 90 && (paragraph === paragraph.toUpperCase() || /^(глава|часть|chapter|part)\b/i.test(paragraph))
-                return isSubhead ? <h2 key={i}>{paragraph}</h2> : <p key={i}>{paragraph}</p>
-              })}
+            <div className={`chapter-text align-${settings.textAlign} ${chapter.format === 'markdown' ? 'is-markdown' : 'is-plain'}`}>
+              {chapter.format === 'markdown' ? (
+                <MarkdownChapter source={chapter.text} />
+              ) : (
+                paragraphs.map((paragraph, i) => {
+                  const isSubhead = paragraph.length < 90 && (paragraph === paragraph.toUpperCase() || /^(глава|часть|chapter|part)\b/i.test(paragraph))
+                  return isSubhead ? <h2 key={i}>{paragraph}</h2> : <p key={i}>{paragraph}</p>
+                })
+              )}
             </div>
 
             <div className="chapter-end">

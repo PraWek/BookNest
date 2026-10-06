@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import unquote, urljoin, urlparse
 import ipaddress
+import re
 import socket
 
 import httpx
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
 from .models import Book, Bookmark, Preference, ReadingProgress
-from .parser import ParseError, parse_book
+from .parser import ParseError, parse_book, repair_legacy_russian_mojibake
 from .schemas import (
     BookmarkIn,
     BookmarkOut,
@@ -32,7 +33,7 @@ from .schemas import (
 )
 
 Base.metadata.create_all(bind=engine)
-app = FastAPI(title="BookNest API", version="1.0.0")
+app = FastAPI(title="BookNest API", version="1.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,8 +57,8 @@ def progress_out(progress: ReadingProgress | None) -> ProgressOut | None:
 def summary_out(book: Book) -> BookSummary:
     return BookSummary(
         id=book.id,
-        title=book.title,
-        author=book.author,
+        title=repair_legacy_russian_mojibake(book.title) or book.title,
+        author=repair_legacy_russian_mojibake(book.author),
         filename=book.filename,
         file_format=book.file_format,
         total_chars=book.total_chars,
@@ -70,7 +71,16 @@ def summary_out(book: Book) -> BookSummary:
 
 def detail_out(book: Book) -> BookDetail:
     base = summary_out(book).model_dump()
-    return BookDetail(**base, chapters=book.chapters or [])
+    is_markdown = book.file_format.lower() in {"md", "markdown"}
+    chapters = []
+    for chapter in book.chapters or []:
+        item = dict(chapter)
+        item["title"] = repair_legacy_russian_mojibake(str(item.get("title") or "Раздел")) or "Раздел"
+        item["text"] = repair_legacy_russian_mojibake(str(item.get("text") or "")) or ""
+        if not item.get("format"):
+            item["format"] = "markdown" if is_markdown else "plain"
+        chapters.append(item)
+    return BookDetail(**base, chapters=chapters)
 
 
 URL_MAX_REDIRECTS = 5
@@ -117,9 +127,9 @@ def _filename_from_url(url: str, content_type: str) -> str:
     return f"{stem or 'book'}{suffix}"[:500]
 
 
-async def _download_public_book(url: str) -> tuple[str, bytes]:
+async def _download_public_book(url: str) -> tuple[str, bytes, str | None]:
     current = url
-    headers = {"User-Agent": "BookNest/1.1 (+book importer)", "Accept": "text/plain,text/html,application/pdf,application/epub+zip,application/octet-stream,*/*;q=0.5"}
+    headers = {"User-Agent": "BookNest/1.2 (+book importer)", "Accept": "text/plain,text/html,application/pdf,application/epub+zip,application/octet-stream,*/*;q=0.5"}
     async with httpx.AsyncClient(timeout=URL_TIMEOUT, headers=headers) as client:
         for _ in range(URL_MAX_REDIRECTS + 1):
             _validate_public_url(current)
@@ -145,15 +155,17 @@ async def _download_public_book(url: str) -> tuple[str, bytes]:
                         if total > 20 * 1024 * 1024:
                             raise HTTPException(status_code=413, detail="Файл по ссылке больше 20 МБ")
                         chunks.append(chunk)
-                    return filename, b"".join(chunks)
+                    charset_match = re.search(r"charset\s*=\s*[\"']?\s*([a-zA-Z0-9._-]+)", content_type, flags=re.I)
+                    encoding_hint = charset_match.group(1) if charset_match else None
+                    return filename, b"".join(chunks), encoding_hint
             except httpx.HTTPError as exc:
                 raise HTTPException(status_code=400, detail="Не удалось скачать книгу по ссылке") from exc
     raise HTTPException(status_code=400, detail="Слишком много перенаправлений по ссылке")
 
 
-def _create_book_from_bytes(filename: str, data: bytes, db: Session) -> Book:
+def _create_book_from_bytes(filename: str, data: bytes, db: Session, encoding_hint: str | None = None) -> Book:
     try:
-        parsed = parse_book(filename, data)
+        parsed = parse_book(filename, data, encoding_hint=encoding_hint)
     except ParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -195,8 +207,8 @@ async def upload_book(file: Annotated[UploadFile, File(...)], db: Session = Depe
 
 @app.post("/api/books/import-url", response_model=BookDetail, status_code=201)
 async def import_book_url(payload: UrlImportIn, db: Session = Depends(get_db)):
-    filename, data = await _download_public_book(str(payload.url))
-    return detail_out(_create_book_from_bytes(filename, data, db))
+    filename, data, encoding_hint = await _download_public_book(str(payload.url))
+    return detail_out(_create_book_from_bytes(filename, data, db, encoding_hint=encoding_hint))
 
 
 @app.get("/api/books/{book_id}", response_model=BookDetail)
