@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: booknest
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: booknest-db
+          property: connectionString
+
+databases:
+  - name: booknest-db
+    plan: free
+    databaseName: booknest
+    user: booknest
+    ipAllowList: []
