@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { alignSpeechBoundaries, narrationBlob, speechWordAt } from '../src/lib/speech.ts'
+import { alignSpeechBoundaries, narrationBlob, speechWordAt, speechWordStart } from '../src/lib/speech.ts'
+
+test('choosing part of a formatted word starts at the whole word', () => {
+  assert.equal(speechWordStart('Глава. подсветка слов', 10), 7)
+  assert.equal(speechWordStart('Глава. подсветка слов', 18), 17)
+  assert.equal(speechWordStart('Слово', 0), 0)
+})
 
 test('repeated words map to their own occurrences, including punctuation', () => {
   const first = { id: 'first' }

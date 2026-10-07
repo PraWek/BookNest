@@ -2,26 +2,36 @@ import { Pause, Play, RotateCcw, Sparkles, Volume2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { api } from '../lib/api'
-import { alignSpeechBoundaries, collectSpeechChunks, narrationBlob, speechWordAt } from '../lib/speech'
+import { alignSpeechBoundaries, collectSpeechChunks, firstVisibleSpeechElement, narrationBlob, speechWordAt } from '../lib/speech'
 import type { TimedSpeechWord } from '../lib/speech'
 import type { TtsVoice } from '../lib/types'
 
 type SpeechStatus = 'idle' | 'loading' | 'speaking' | 'paused'
+type StartMode = 'beginning' | 'visible' | 'selected'
 
-export default function SpeechPanel({ open, title, contentRef, onClose }: {
+export default function SpeechPanel({ open, title, contentRef, onClose, onOpen, onPickStart }: {
   open: boolean
   title: string
   contentRef: RefObject<HTMLElement | null>
   onClose: () => void
+  onOpen: () => void
+  onPickStart: () => void
 }) {
   const [voices, setVoices] = useState<TtsVoice[]>([])
   const [voiceId, setVoiceId] = useState(() => localStorage.getItem('booknest-neural-voice') || 'ru-RU-SvetlanaNeural')
-  const [rate, setRate] = useState(() => Number(localStorage.getItem('booknest-tts-rate') || '1'))
+  const [rate, setRate] = useState(() => {
+    const saved = Number(localStorage.getItem('booknest-tts-rate') || '1')
+    return Number.isFinite(saved) ? Math.max(0.7, Math.min(1.35, saved)) : 1
+  })
   const [highlightEnabled, setHighlightEnabled] = useState(() => localStorage.getItem('booknest-tts-highlight') !== 'false')
   const [status, setStatus] = useState<SpeechStatus>('idle')
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState('')
   const [previewing, setPreviewing] = useState(false)
+  const [startMode, setStartMode] = useState<StartMode>('beginning')
+  const [startElement, setStartElement] = useState<HTMLElement | null>(null)
+  const [startExcerpt, setStartExcerpt] = useState('')
+  const [picking, setPicking] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -32,6 +42,7 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
   const wordsRef = useRef<TimedSpeechWord[]>([])
   const highlightedRef = useRef<HTMLElement[]>([])
   const highlightEnabledRef = useRef(highlightEnabled)
+  const rateRef = useRef(rate)
 
   const selectedVoice = voices.find((voice) => voice.id === voiceId) || voices[0]
 
@@ -47,7 +58,11 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
     return () => controller.abort()
   }, [])
 
-  useEffect(() => { localStorage.setItem('booknest-tts-rate', String(rate)) }, [rate])
+  useEffect(() => {
+    localStorage.setItem('booknest-tts-rate', String(rate))
+    rateRef.current = rate
+    if (audioRef.current) audioRef.current.playbackRate = rate
+  }, [rate])
   useEffect(() => { localStorage.setItem('booknest-neural-voice', voiceId) }, [voiceId])
   useEffect(() => {
     localStorage.setItem('booknest-tts-highlight', String(highlightEnabled))
@@ -120,6 +135,52 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
 
   useEffect(() => () => cancelPlayback(), [])
 
+  useEffect(() => {
+    const root = contentRef.current
+    if (!picking || !root) return
+    root.classList.add('speech-picking')
+    const elements = [...root.querySelectorAll<HTMLElement>('[data-speech-content] [data-speech-word], [data-speech-content] .katex')]
+    const previousTabIndices = elements.map((element) => element.getAttribute('tabindex'))
+    elements.forEach((element) => element.setAttribute('tabindex', '0'))
+    firstVisibleSpeechElement(root)?.focus({ preventScroll: true })
+
+    const choose = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent && event.key !== 'Enter' && event.key !== ' ') return
+      const element = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-speech-word], .katex') : null
+      if (!element || !root.contains(element)) return
+      const chunks = collectSpeechChunks(root, 1250, element)
+      if (!chunks.length) return
+      event.preventDefault()
+      event.stopPropagation()
+      setStartElement(element)
+      setStartExcerpt(chunks[0].text.slice(0, 110))
+      setStartMode('selected')
+      setPicking(false)
+      onOpen()
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      setPicking(false)
+      onOpen()
+    }
+    root.addEventListener('click', choose, true)
+    root.addEventListener('keydown', choose, true)
+    document.addEventListener('keydown', escape, true)
+    return () => {
+      root.classList.remove('speech-picking')
+      elements.forEach((element, index) => {
+        const previous = previousTabIndices[index]
+        if (previous === null) element.removeAttribute('tabindex')
+        else element.setAttribute('tabindex', previous)
+      })
+      root.removeEventListener('click', choose, true)
+      root.removeEventListener('keydown', choose, true)
+      document.removeEventListener('keydown', escape, true)
+    }
+  }, [picking, contentRef, onOpen])
+
   const playBlob = async (blob: Blob, token: number, words: TimedSpeechWord[] = [], onProgress?: (fraction: number) => void) => {
     if (token !== runRef.current) return
     clearAudio()
@@ -127,6 +188,8 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
     const url = URL.createObjectURL(blob)
     objectUrlRef.current = url
     const audio = new Audio(url)
+    audio.playbackRate = rateRef.current
+    audio.preservesPitch = true
     audioRef.current = audio
     await new Promise<void>((resolve, reject) => {
       finishCurrentRef.current = resolve
@@ -146,8 +209,13 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
 
   const start = async () => {
     if (!selectedVoice || !contentRef.current) return
-    const chunks = collectSpeechChunks(contentRef.current)
-    if (!chunks.length) return
+    const from = startMode === 'visible' ? firstVisibleSpeechElement(contentRef.current) : startMode === 'selected' ? startElement : null
+    if (startMode !== 'beginning' && !from) {
+      setError('Прокрутите страницу к нужному тексту или выберите слово для начала чтения.')
+      return
+    }
+    const chunks = collectSpeechChunks(contentRef.current, 1250, from)
+    if (!chunks.length) { setError('Выберите другое слово для начала чтения.'); return }
     stop()
     const token = runRef.current
     setError('')
@@ -159,7 +227,9 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
         const controller = new AbortController()
         abortRef.current = controller
         const chunk = chunks[index]
-        const narration = await api.ttsNarration(chunk.text, selectedVoice.id, rate, controller.signal)
+        // Generate at normal speed so timestamps always use the audio timeline.
+        // HTML Audio applies the live rate, including changes during synthesis.
+        const narration = await api.ttsNarration(chunk.text, selectedVoice.id, 1, controller.signal)
         if (token !== runRef.current) return
         if (!narration.boundaries.length) setError('Сервис не вернул метки слов. Чтение продолжится без подсветки.')
         setStatus('speaking')
@@ -221,6 +291,12 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
     }
   }
 
+  if (picking) return (
+    <div className="speech-pick-hint" role="region" aria-label="Выбор начала чтения">
+      <span>Нажмите на слово, с которого читать</span>
+      <button className="btn ghost" onClick={() => { setPicking(false); onOpen() }}>Отмена</button>
+    </div>
+  )
   if (!open) return null
 
   return (
@@ -236,6 +312,20 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
       </div>
       <div className="speech-progress"><i style={{ width: `${progress}%` }} /></div>
 
+      <label className="speech-field">
+        <span>Начать чтение</span>
+        <select aria-label="Начать чтение" value={startMode} onChange={(e) => setStartMode(e.target.value as StartMode)}>
+          <option value="beginning">С начала главы</option>
+          <option value="visible">С текущего места на странице</option>
+          <option value="selected" disabled={!startElement}>С выбранного слова</option>
+        </select>
+      </label>
+      <div className="speech-start-controls">
+        <button className="btn ghost" onClick={() => { stop(); setPicking(true); onPickStart() }}>Выбрать слово в тексте</button>
+        {startMode === 'selected' && <p className="speech-start-excerpt">«{startExcerpt}…»</p>}
+        {startMode === 'visible' && <p className="speech-start-excerpt">Чтение начнётся с первого видимого слова при запуске.</p>}
+      </div>
+
       <label className="speech-field voice-field">
         <span>Neural-голос</span>
         <div className="voice-select-row">
@@ -247,7 +337,7 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
         {selectedVoice && <small className="voice-description">{selectedVoice.language} · {selectedVoice.gender === 'female' ? 'женский' : 'мужской'} · {selectedVoice.description}</small>}
       </label>
 
-      <label className="speech-field"><span>Скорость <b>{rate.toFixed(1)}×</b></span><input type="range" min="0.7" max="1.35" step="0.05" value={rate} onChange={(e) => setRate(Number(e.target.value))} /></label>
+      <label className="speech-field"><span>Скорость <b>{rate.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}×</b></span><input aria-label="Скорость чтения" type="range" min="0.7" max="1.35" step="0.05" value={rate} onChange={(e) => setRate(Number(e.target.value))} /></label>
       <div className="speech-highlight-setting toggle-row">
         <div><span id="speech-highlight-label">Подсветка слов</span><small>Выделять слова во время чтения</small></div>
         <button type="button" className={`toggle ${highlightEnabled ? 'on' : ''}`} role="switch" aria-checked={highlightEnabled}
@@ -258,7 +348,7 @@ export default function SpeechPanel({ open, title, contentRef, onClose }: {
       <div className="speech-actions">
         <button className="btn primary" onClick={status === 'idle' ? start : status === 'loading' ? stop : togglePause}>
           {status === 'speaking' ? <Pause size={17} /> : status === 'loading' ? <RotateCcw size={17} /> : <Play size={17} />}
-          {status === 'paused' ? 'Продолжить' : status === 'speaking' ? 'Пауза' : status === 'loading' ? 'Отменить' : 'Читать главу'}
+          {status === 'paused' ? 'Продолжить' : status === 'speaking' ? 'Пауза' : status === 'loading' ? 'Отменить' : startMode === 'beginning' ? 'Читать главу' : 'Читать отсюда'}
         </button>
         <button className="btn ghost" onClick={stop} disabled={status === 'idle'}><RotateCcw size={16} /> Стоп</button>
       </div>

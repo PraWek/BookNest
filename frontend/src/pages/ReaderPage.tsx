@@ -41,6 +41,12 @@ export default function ReaderPage() {
   const [error, setError] = useState('')
   const [savedPulse, setSavedPulse] = useState(false)
   const [speechOpen, setSpeechOpen] = useState(false)
+  const openSpeech = useCallback(() => setSpeechOpen(true), [])
+  const pickSpeechStart = useCallback(() => {
+    setSpeechOpen(false)
+    setSideOpen(false)
+    setSettingsOpen(false)
+  }, [])
 
   useEffect(() => {
     if (!Number.isFinite(id)) return
@@ -264,7 +270,7 @@ export default function ReaderPage() {
       </div>
 
       <ReaderSettingsPanel open={settingsOpen} settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} />
-      <SpeechPanel key={`${id}-${chapterIndex}`} open={speechOpen} title={chapter.title} contentRef={contentRef} onClose={() => setSpeechOpen(false)} />
+      <SpeechPanel key={`${id}-${chapterIndex}`} open={speechOpen} title={chapter.title} contentRef={contentRef} onClose={() => setSpeechOpen(false)} onOpen={openSpeech} onPickStart={pickSpeechStart} />
 
       <nav className="reader-mobile-nav mobile-only">
         <button onClick={() => { setSideTab('contents'); setSideOpen(true) }}><List size={18} /><span>Главы</span></button>

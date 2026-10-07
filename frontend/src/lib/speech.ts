@@ -8,7 +8,7 @@ const BLOCK_TAGS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'
 
 // Use the rendered chapter: links, entities and inline formatting must match
 // the spoken text, rather than offsets in the original Markdown source.
-export function collectSpeechChunks(root: HTMLElement, maxLength = 1250): SpeechChunk[] {
+export function collectSpeechChunks(root: HTMLElement, maxLength = 1250, startElement?: HTMLElement | null): SpeechChunk[] {
   let text = ''
   const words: SpeechWord[] = []
   const append = (value: string, element?: HTMLElement) => {
@@ -44,6 +44,11 @@ export function collectSpeechChunks(root: HTMLElement, maxLength = 1250): Speech
 
   const chunks: SpeechChunk[] = []
   let start = 0
+  if (startElement) {
+    const firstWord = words.find((word) => word.element === startElement || word.element.contains(startElement) || startElement.contains(word.element))
+    if (!firstWord) return []
+    start = speechWordStart(text, firstWord.start)
+  }
   while (start < text.length) {
     while (text[start] === ' ') start += 1
     if (start >= text.length) break
@@ -65,6 +70,22 @@ export function collectSpeechChunks(root: HTMLElement, maxLength = 1250): Speech
     start = end
   }
   return chunks
+}
+
+// A word may cross inline Markdown elements; start at its first character.
+export function speechWordStart(text: string, offset: number): number {
+  let start = Math.max(0, Math.min(text.length, offset))
+  while (start > 0 && !/\s/u.test(text[start - 1])) start -= 1
+  return start
+}
+
+export function firstVisibleSpeechElement(root: HTMLElement): HTMLElement | null {
+  const scroller = root.closest('.reading-scroll')
+  const viewport = scroller?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight, left: 0, right: window.innerWidth }
+  return [...root.querySelectorAll<HTMLElement>('[data-speech-content] [data-speech-word], [data-speech-content] .katex')]
+    .find((element) => [...element.getClientRects()].some((rect) =>
+      rect.bottom > Math.max(0, viewport.top) && rect.top < Math.min(window.innerHeight, viewport.bottom) &&
+      rect.right > Math.max(0, viewport.left) && rect.left < Math.min(window.innerWidth, viewport.right))) ?? null
 }
 
 export function alignSpeechBoundaries(chunk: SpeechChunk, boundaries: TtsWordBoundary[]): TimedSpeechWord[] {
