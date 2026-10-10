@@ -19,7 +19,7 @@ body { min-width: 320px; }
 button, input, select { font: inherit; }
 button { color: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
-button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid #518d79; outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--app-accent, #518d79); outline-offset: 2px; }
 
 .btn {
   min-height: 42px;
@@ -135,17 +135,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .form-field input:focus { border-color: #6b9384; box-shadow: 0 0 0 3px rgba(78,116,101,.1); }
 
 /* Reader themes and shell */
-.reader-shell, .theme-paper {
+.reader-shell, .theme-paper, :root[data-page-theme="paper"] {
   --reader-bg: #f4efe5; --reader-page: #fbf8f0; --reader-ink: #2f2c27; --reader-muted: #8f887d;
   --reader-border: rgba(50,46,39,.11); --reader-ui: rgba(250,248,242,.88); --reader-hover: rgba(70,64,56,.07); --reader-accent: #4d725f;
 }
 .reader-shell {
   position: relative; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; background: var(--reader-bg); color: var(--reader-ink); transition: background .25s ease, color .25s ease;
 }
-.theme-ivory { --reader-bg: #ece8dc; --reader-page: #fffdf5; --reader-ink: #292823; --reader-muted: #817c71; --reader-border: rgba(55,50,42,.1); --reader-ui: rgba(250,248,241,.92); --reader-hover: rgba(60,57,50,.07); --reader-accent: #4e7464; }
-.theme-sepia { --reader-bg: #d9cbb4; --reader-page: #eee2cb; --reader-ink: #4b3c2e; --reader-muted: #887461; --reader-border: rgba(81,59,38,.13); --reader-ui: rgba(231,218,194,.93); --reader-hover: rgba(95,72,45,.08); --reader-accent: #806143; }
-.theme-night { --reader-bg: #1b1c1b; --reader-page: #222322; --reader-ink: #d9d7d0; --reader-muted: #878984; --reader-border: rgba(255,255,255,.08); --reader-ui: rgba(28,29,28,.92); --reader-hover: rgba(255,255,255,.06); --reader-accent: #8fae9d; }
-.theme-midnight { --reader-bg: #111821; --reader-page: #17212b; --reader-ink: #d6dce1; --reader-muted: #7f8b96; --reader-border: rgba(255,255,255,.075); --reader-ui: rgba(16,24,32,.94); --reader-hover: rgba(255,255,255,.06); --reader-accent: #83a8b3; }
+.theme-ivory, :root[data-page-theme="ivory"] { --reader-bg: #ece8dc; --reader-page: #fffdf5; --reader-ink: #292823; --reader-muted: #817c71; --reader-border: rgba(55,50,42,.1); --reader-ui: rgba(250,248,241,.92); --reader-hover: rgba(60,57,50,.07); --reader-accent: #4e7464; }
+.theme-sepia, :root[data-page-theme="sepia"] { --reader-bg: #d9cbb4; --reader-page: #eee2cb; --reader-ink: #4b3c2e; --reader-muted: #887461; --reader-border: rgba(81,59,38,.13); --reader-ui: rgba(231,218,194,.93); --reader-hover: rgba(95,72,45,.08); --reader-accent: #806143; }
+.theme-night, :root[data-page-theme="night"] { --reader-bg: #1b1c1b; --reader-page: #222322; --reader-ink: #d9d7d0; --reader-muted: #878984; --reader-border: rgba(255,255,255,.08); --reader-ui: rgba(28,29,28,.92); --reader-hover: rgba(255,255,255,.06); --reader-accent: #8fae9d; }
+.theme-midnight, :root[data-page-theme="midnight"] { --reader-bg: #111821; --reader-page: #17212b; --reader-ink: #d6dce1; --reader-muted: #7f8b96; --reader-border: rgba(255,255,255,.075); --reader-ui: rgba(16,24,32,.94); --reader-hover: rgba(255,255,255,.06); --reader-accent: #83a8b3; }
 .font-literata .chapter-text, .font-literata .reading-page > h1 { font-family: Charter, "Bitstream Charter", "Sitka Text", Georgia, serif; }
 .font-georgia .chapter-text, .font-georgia .reading-page > h1 { font-family: Georgia, "Times New Roman", serif; }
 .font-humanist .chapter-text, .font-humanist .reading-page > h1 { font-family: "Trebuchet MS", Calibri, Candara, sans-serif; }
@@ -368,18 +368,37 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   --accent-2: #69a18d;
 }
 
+/* The book, library and interface share the selected page palette. */
+:root[data-page-theme] {
+  background: var(--app-bg);
+  color: var(--app-text);
+  --app-bg: var(--reader-bg);
+  --app-bg-2: var(--reader-bg);
+  --app-surface: var(--reader-ui);
+  --app-surface-solid: var(--reader-page);
+  --app-elevated: var(--reader-page);
+  --app-text: var(--reader-ink);
+  --app-muted: var(--reader-muted);
+  --app-line: var(--reader-border);
+  --app-hover: var(--reader-hover);
+  --app-accent: var(--reader-accent);
+  --app-accent-2: color-mix(in srgb, var(--reader-accent) 85%, var(--reader-ink));
+  --ink: var(--app-text); --muted: var(--app-muted); --line: var(--app-line);
+  --panel: var(--app-surface-solid); --accent: var(--app-accent); --accent-2: var(--app-accent-2);
+}
 body { background: var(--app-bg); color: var(--app-text); }
+.brand-mark { background: var(--app-accent); }
 .app-loading { min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; background: var(--reader-bg, var(--app-bg)); color: var(--reader-muted, var(--app-muted)); font-size: 14px; }
 .loading-spinner { width: 28px; height: 28px; border: 2px solid color-mix(in srgb, currentColor 16%, transparent); border-top-color: currentColor; border-radius: 50%; animation: spin .8s linear infinite; }
 :root[data-ui-style="liquid"] .app-loading, :root[data-ui-style="liquid"] .boot-loading {
-  background: radial-gradient(circle at 15% 20%, rgba(126,216,255,.12), transparent 36%), radial-gradient(circle at 85% 75%, rgba(167,124,255,.12), transparent 36%), var(--reader-bg, var(--boot-bg, var(--app-bg)));
+  background: radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--app-accent) 12%, transparent), transparent 36%), radial-gradient(circle at 85% 75%, color-mix(in srgb, var(--app-muted) 12%, transparent), transparent 36%), var(--reader-bg, var(--boot-bg, var(--app-bg)));
 }
 @media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }
 .library-shell {
   color: var(--app-text);
   background:
     radial-gradient(circle at 78% -8%, color-mix(in srgb, var(--app-accent) 16%, transparent), transparent 34%),
-    radial-gradient(circle at 5% 15%, color-mix(in srgb, #8a6fd6 8%, transparent), transparent 28%),
+    radial-gradient(circle at 5% 15%, color-mix(in srgb, var(--app-muted) 8%, transparent), transparent 28%),
     linear-gradient(180deg, var(--app-bg) 0%, var(--app-bg-2) 100%);
 }
 .site-header { background: color-mix(in srgb, var(--app-surface-solid) 74%, transparent); border-color: var(--app-line); }
@@ -441,8 +460,8 @@ body { background: var(--app-bg); color: var(--app-text); }
 /* Visual modes */
 :root[data-ui-style="glass"] .library-shell {
   background:
-    radial-gradient(circle at 80% 0%, color-mix(in srgb, #66a88e 28%, transparent), transparent 33%),
-    radial-gradient(circle at 6% 30%, color-mix(in srgb, #8c75d6 18%, transparent), transparent 30%),
+    radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--app-accent) 28%, transparent), transparent 33%),
+    radial-gradient(circle at 6% 30%, color-mix(in srgb, var(--app-muted) 18%, transparent), transparent 30%),
     var(--app-bg);
 }
 :root[data-ui-style="glass"] .site-header,
@@ -581,9 +600,9 @@ body { background: var(--app-bg); color: var(--app-text); }
 :root[data-ui-style="liquid"] .library-shell {
   position: relative; isolation: isolate; overflow-x: clip;
   background:
-    radial-gradient(circle at 12% 10%, color-mix(in srgb, #7ed8ff 28%, transparent), transparent 32%),
-    radial-gradient(circle at 86% 4%, color-mix(in srgb, #a77cff 24%, transparent), transparent 31%),
-    radial-gradient(circle at 72% 72%, color-mix(in srgb, #5ce1b9 20%, transparent), transparent 34%),
+    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--app-accent) 28%, transparent), transparent 32%),
+    radial-gradient(circle at 86% 4%, color-mix(in srgb, var(--app-muted) 24%, transparent), transparent 31%),
+    radial-gradient(circle at 72% 72%, color-mix(in srgb, var(--app-accent) 20%, transparent), transparent 34%),
     linear-gradient(145deg, var(--app-bg), var(--app-bg-2));
 }
 :root[data-ui-style="liquid"] .library-shell::before,
@@ -592,12 +611,12 @@ body { background: var(--app-bg); color: var(--app-text); }
 }
 :root[data-ui-style="liquid"] .library-shell::before {
   width: 38vw; height: 38vw; min-width: 380px; min-height: 380px; left: -11vw; top: 24vh;
-  background: linear-gradient(135deg, color-mix(in srgb, #7fe7ff 58%, transparent), color-mix(in srgb, #8f77ff 40%, transparent));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 58%, transparent), color-mix(in srgb, var(--app-muted) 40%, transparent));
   animation: liquidFloatA 16s ease-in-out infinite alternate;
 }
 :root[data-ui-style="liquid"] .library-shell::after {
   width: 34vw; height: 34vw; min-width: 340px; min-height: 340px; right: -8vw; top: 42vh;
-  background: linear-gradient(135deg, color-mix(in srgb, #76f0c8 48%, transparent), color-mix(in srgb, #ff9fc6 34%, transparent));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 48%, transparent), color-mix(in srgb, var(--app-muted) 34%, transparent));
   animation: liquidFloatB 19s ease-in-out infinite alternate;
 }
 @keyframes liquidFloatA { to { transform: translate3d(7vw,-7vh,0) rotate(12deg) scale(1.08); } }
@@ -679,8 +698,6 @@ body { background: var(--app-bg); color: var(--app-text); }
   background: color-mix(in srgb, var(--app-surface-solid) 72%, transparent); color: var(--app-muted); cursor: pointer; transition: .18s ease;
 }
 .appearance-style-cycle:hover { color: var(--app-text); background: var(--app-hover); transform: translateY(-1px); }
-.appearance-style-cycle.style-liquid { color: var(--app-text); box-shadow: inset 0 1px 0 rgba(255,255,255,.26), 0 6px 20px rgba(41,92,110,.12); }
-:root[data-ui-style="liquid"] .appearance-style-cycle { border-color: color-mix(in srgb, white 30%, var(--app-line)); background: color-mix(in srgb, var(--app-surface-solid) 44%, transparent); backdrop-filter: blur(18px) saturate(160%); }
 @media (max-width: 780px) { .appearance-style-cycle { width: 33px; height: 33px; flex-basis: 33px; } }
 
 /* ===== BookNest 1.3: structural appearance presets ===== */
@@ -704,7 +721,6 @@ body { background: var(--app-bg); color: var(--app-text); }
 .style-popover > button { width: 100%; border: 0; border-radius: 13px; background: transparent; color: var(--app-text); padding: 10px; display: grid; grid-template-columns: 28px 1fr; gap: 8px; align-items: center; text-align: left; cursor: pointer; }
 .style-popover > button:hover, .style-popover > button.active { background: var(--app-hover); }
 .style-popover > button > svg { color: var(--app-accent); }
-.style-popover > button.style-liquid > svg { color: inherit; }
 .style-popover strong, .style-popover small { display: block; }
 .style-popover strong { font-size: 12px; }
 .style-popover small { margin-top: 2px; color: var(--app-muted); font-size: 9px; font-weight: 500; }
@@ -766,7 +782,7 @@ body { background: var(--app-bg); color: var(--app-text); }
 :root[data-ui-style="liquid"] .book-meta { padding: 16px 8px 8px; }
 :root[data-ui-style="liquid"] .progress-track { height: 5px; background: color-mix(in srgb, var(--app-text) 9%, transparent); }
 
-:root[data-ui-style="liquid"] .reader-shell { background-image: radial-gradient(circle at 10% 18%, color-mix(in srgb, var(--reader-accent) 22%, transparent), transparent 28%), radial-gradient(circle at 92% 82%, rgba(90,130,185,.13), transparent 32%); }
+:root[data-ui-style="liquid"] .reader-shell { background-image: radial-gradient(circle at 10% 18%, color-mix(in srgb, var(--reader-accent) 22%, transparent), transparent 28%), radial-gradient(circle at 92% 82%, color-mix(in srgb, var(--reader-muted) 13%, transparent), transparent 32%); }
 :root[data-ui-style="liquid"] .reader-topbar { position: absolute; top: 14px; left: 18px; right: 18px; height: 62px; border: 1px solid color-mix(in srgb, white 28%, var(--reader-border)); border-radius: 22px; box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 18px 55px rgba(0,0,0,.09); background: color-mix(in srgb, var(--reader-ui) 70%, transparent); }
 :root[data-ui-style="liquid"] .reader-body { height: 100vh; padding-top: 88px; }
 :root[data-ui-style="liquid"] .reading-scroll { padding: 18px 28px 64px; }

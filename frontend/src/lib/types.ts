@@ -42,6 +42,16 @@ export type ReaderSettings = {
   focusMode: boolean
 }
 
+export type AppTheme = 'system' | 'light' | 'dark'
+export type AppStyle = 'soft' | 'glass' | 'liquid' | 'minimal'
+export type ResolvedTheme = 'light' | 'dark'
+export type PageTheme = ReaderSettings['theme']
+export type AppearancePreferences = ReaderSettings & {
+  uiTheme?: AppTheme
+  uiStyle?: AppStyle
+  pageThemes?: Partial<Record<ResolvedTheme, PageTheme>>
+}
+
 
 export type TtsVoice = {
   id: string

@@ -1,4 +1,4 @@
-import type { Bookmark, BookDetail, BookSummary, ReaderSettings, TtsVoice, TtsNarration } from './types'
+import type { Bookmark, BookDetail, BookSummary, AppearancePreferences, TtsVoice, TtsNarration } from './types'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options)
@@ -44,9 +44,9 @@ export const api = {
       body: JSON.stringify(payload)
     }),
   removeBookmark: (id: number) => request<void>(`/api/bookmarks/${id}`, { method: 'DELETE' }),
-  preferences: () => request<{ settings: ReaderSettings }>('/api/preferences'),
-  savePreferences: (settings: ReaderSettings) =>
-    request<{ settings: ReaderSettings }>('/api/preferences', {
+  preferences: () => request<{ settings: AppearancePreferences }>('/api/preferences'),
+  savePreferences: (settings: AppearancePreferences) =>
+    request<{ settings: AppearancePreferences }>('/api/preferences', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ settings })

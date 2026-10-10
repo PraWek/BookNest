@@ -1,14 +1,8 @@
 import { AlignJustify, AlignLeft, Minus, Plus, X } from 'lucide-react'
 import type { ReaderSettings } from '../lib/types'
 import AppearanceControl from './AppearanceControl'
-
-const THEMES: { key: ReaderSettings['theme']; name: string }[] = [
-  { key: 'paper', name: 'Бумага' },
-  { key: 'ivory', name: 'Слоновая кость' },
-  { key: 'sepia', name: 'Сепия' },
-  { key: 'night', name: 'Ночь' },
-  { key: 'midnight', name: 'Полночь' },
-]
+import { useAppearance } from '../lib/theme'
+import { PAGE_THEMES } from '../lib/appearance'
 
 const FONTS: { key: ReaderSettings['fontFamily']; name: string; sample: string }[] = [
   { key: 'literata', name: 'Книжный', sample: 'Aa' },
@@ -29,6 +23,8 @@ export default function ReaderSettingsPanel({
   onChange: (next: ReaderSettings) => void
   onClose: () => void
 }) {
+  const { resolvedTheme } = useAppearance()
+  const themes = PAGE_THEMES.filter((theme) => theme.mode === resolvedTheme)
   const set = <K extends keyof ReaderSettings>(key: K, value: ReaderSettings[K]) => onChange({ ...settings, [key]: value })
 
   return (
@@ -49,9 +45,9 @@ export default function ReaderSettingsPanel({
 
         <div className="setting-section">
           <label>Тема страницы книги</label>
-          <div className="theme-grid">
-            {THEMES.map((theme) => (
-              <button key={theme.key} className={`theme-chip ${theme.key} ${settings.theme === theme.key ? 'active' : ''}`} onClick={() => set('theme', theme.key)}>
+          <div className="theme-grid" style={{ gridTemplateColumns: `repeat(${themes.length}, minmax(0, 1fr))` }}>
+            {themes.map((theme) => (
+              <button key={theme.key} className={`theme-chip ${theme.key} ${settings.theme === theme.key ? 'active' : ''}`} aria-pressed={settings.theme === theme.key} onClick={() => set('theme', theme.key)}>
                 <i /> <span>{theme.name}</span>
               </button>
             ))}
