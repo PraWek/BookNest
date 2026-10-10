@@ -101,7 +101,7 @@ export default function ReaderSettingsPanel({
 
         <div className="setting-section toggle-row">
           <div><label>Режим фокусировки</label><span>Скрывает лишние элементы во время чтения</span></div>
-          <button className={`toggle ${settings.focusMode ? 'on' : ''}`} onClick={() => set('focusMode', !settings.focusMode)} aria-label="Режим фокусировки"><i /></button>
+          <button className={`toggle ${settings.focusMode ? 'on' : ''}`} onClick={() => set('focusMode', !settings.focusMode)} role="switch" aria-checked={settings.focusMode} aria-label="Режим фокусировки"><i /></button>
         </div>
       </div>
     </aside>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Bookmark as BookmarkIcon, ChevronLeft, ChevronRight, Expand, List, Menu,
-  Search, Settings2, Trash2, X, BookOpen, Clock3, Keyboard, Check, PanelLeftClose, Volume2, Minimize2
+  Search, Settings2, Trash2, X, BookOpen, Clock3, Keyboard, Check, PanelLeftClose, Volume2, Minimize2, Shrink
 } from 'lucide-react'
 import ReaderSettingsPanel from '../components/ReaderSettingsPanel'
 import MarkdownChapter from '../components/MarkdownChapter'
@@ -13,6 +13,7 @@ import { api } from '../lib/api'
 import type { Bookmark, BookDetail, ReaderSettings } from '../lib/types'
 import { estimateMinutes, formatDuration, progressPercent, splitParagraphs } from '../lib/text'
 import { saveReaderTheme, storedReaderTheme } from '../lib/readerTheme'
+import { currentFullscreenElement, enterFullscreen, leaveFullscreen } from '../lib/fullscreen'
 
 const DEFAULT_SETTINGS: ReaderSettings = {
   theme: 'paper', fontFamily: 'literata', fontSize: 19, lineHeight: 1.75,
@@ -43,6 +44,69 @@ export default function ReaderPage() {
   const [error, setError] = useState('')
   const [savedPulse, setSavedPulse] = useState(false)
   const [speechOpen, setSpeechOpen] = useState(false)
+  const [nativeFullscreen, setNativeFullscreen] = useState(() => Boolean(currentFullscreenElement()))
+  const [expanded, setExpanded] = useState(false)
+  const [fullscreenBusy, setFullscreenBusy] = useState(false)
+  const [displayError, setDisplayError] = useState('')
+  const isFullscreen = nativeFullscreen || expanded
+  const closePanels = useCallback(() => {
+    setSpeechOpen(false)
+    setSideOpen(false)
+    setSettingsOpen(false)
+  }, [])
+  const exitFocus = useCallback(() => {
+    closePanels()
+    setExpanded(false)
+    setSettings((s) => ({ ...s, focusMode: false }))
+  }, [closePanels])
+  const applySettings = (next: ReaderSettings) => {
+    if (next.focusMode && !settings.focusMode) closePanels()
+    if (!next.focusMode && settings.focusMode) setExpanded(false)
+    setSettings(next)
+  }
+  const toggleFullscreen = async () => {
+    if (fullscreenBusy) return
+    setFullscreenBusy(true)
+    setDisplayError('')
+    try {
+      if (currentFullscreenElement()) {
+        if (!await leaveFullscreen()) setDisplayError('Не удалось выйти из полного экрана. Попробуйте ещё раз.')
+        setNativeFullscreen(Boolean(currentFullscreenElement()))
+      } else if (expanded) {
+        setExpanded(false)
+      } else {
+        closePanels()
+        const entered = await enterFullscreen(document.documentElement)
+        setNativeFullscreen(entered)
+        setExpanded(!entered)
+      }
+    } finally {
+      setFullscreenBusy(false)
+    }
+  }
+  useEffect(() => {
+    const sync = () => {
+      const active = Boolean(currentFullscreenElement())
+      setNativeFullscreen(active)
+      if (active) setExpanded(false)
+    }
+    const fallback = () => {
+      if (!currentFullscreenElement()) {
+        setNativeFullscreen(false)
+        setExpanded(true)
+      }
+    }
+    document.addEventListener('fullscreenchange', sync)
+    document.addEventListener('webkitfullscreenchange', sync)
+    document.addEventListener('fullscreenerror', fallback)
+    document.addEventListener('webkitfullscreenerror', fallback)
+    return () => {
+      document.removeEventListener('fullscreenchange', sync)
+      document.removeEventListener('webkitfullscreenchange', sync)
+      document.removeEventListener('fullscreenerror', fallback)
+      document.removeEventListener('webkitfullscreenerror', fallback)
+    }
+  }, [])
   const openSpeech = useCallback(() => setSpeechOpen(true), [])
   const pickSpeechStart = useCallback(() => {
     setSpeechOpen(false)
@@ -123,19 +187,19 @@ export default function ReaderPage() {
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return
       if (e.key === 'ArrowLeft') changeChapter(chapterIndex - 1)
       if (e.key === 'ArrowRight') changeChapter(chapterIndex + 1)
-      if (e.key.toLowerCase() === 'f') setSettings((s) => ({ ...s, focusMode: !s.focusMode }))
+      if (e.key.toLowerCase() === 'f') {
+        closePanels()
+        setSettings((s) => ({ ...s, focusMode: !s.focusMode }))
+      }
       if (e.key === '+' || e.key === '=') setSettings((s) => ({ ...s, fontSize: Math.min(34, s.fontSize + 1) }))
       if (e.key === '-') setSettings((s) => ({ ...s, fontSize: Math.max(14, s.fontSize - 1) }))
       if (e.key === 'Escape') {
-        setSettingsOpen(false)
-        setSideOpen(false)
-        setSpeechOpen(false)
-        setSettings((s) => s.focusMode ? { ...s, focusMode: false } : s)
+        exitFocus()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [changeChapter, chapterIndex])
+  }, [changeChapter, chapterIndex, closePanels, exitFocus])
 
   const overall = book ? progressPercent(chapterIndex, book.chapters.length, scrollPercent) : 0
   const chapter = book?.chapters[chapterIndex]
@@ -180,14 +244,20 @@ export default function ReaderPage() {
   } as React.CSSProperties
 
   return (
-    <div className={`reader-shell theme-${settings.theme} font-${settings.fontFamily} ${settings.focusMode ? 'focus-mode' : ''}`} style={readerVars}>
+    <div className={`reader-shell theme-${settings.theme} font-${settings.fontFamily} ${settings.focusMode ? 'focus-mode' : ''} ${expanded ? 'expanded-mode' : ''}`} style={readerVars}>
       <div className="reader-progress-top"><i style={{ width: `${overall}%` }} /></div>
 
-      {settings.focusMode && (
-        <button className="focus-exit" onClick={() => setSettings((s) => ({ ...s, focusMode: false }))} title="Выйти из режима фокусировки (F или Esc)">
-          <Minimize2 size={15} /><span>Выйти из фокуса</span><kbd>F</kbd>
-        </button>
+      {(settings.focusMode || expanded) && (
+        <div className="reader-exit-controls">
+          {settings.focusMode && <button className="focus-exit" onClick={exitFocus} aria-label="Выйти из режима фокусировки" title="Выйти из режима фокусировки (F или Esc)">
+            <Minimize2 size={18} /><span>Выйти из фокуса</span><kbd>F</kbd>
+          </button>}
+          {isFullscreen && <button className="fullscreen-exit" onClick={toggleFullscreen} disabled={fullscreenBusy} aria-label="Выйти из полноэкранного режима">
+            <Shrink size={18} /><span>Выйти из полного экрана</span>
+          </button>}
+        </div>
       )}
+      {displayError && <p className="reader-display-error" role="status">{displayError}</p>}
 
       <header className="reader-topbar">
         <div className="reader-top-left">
@@ -199,7 +269,7 @@ export default function ReaderPage() {
         <div className="reader-actions">
           <button className={`icon-btn ${speechOpen ? 'active' : ''}`} onClick={() => { setSpeechOpen(!speechOpen); setSettingsOpen(false) }} title="Озвучить текст"><Volume2 size={18} /></button>
           <button className="icon-btn" onClick={addBookmark} title="Добавить закладку"><BookmarkIcon size={18} /></button>
-          <button className="icon-btn desktop-only" onClick={() => document.documentElement.requestFullscreen?.()} title="На весь экран"><Expand size={18} /></button>
+          <button className="icon-btn fullscreen-toggle" onClick={toggleFullscreen} disabled={fullscreenBusy} aria-pressed={isFullscreen} aria-label={isFullscreen ? 'Выйти из полноэкранного режима' : 'На весь экран'} title={isFullscreen ? 'Выйти из полноэкранного режима' : 'На весь экран'}>{isFullscreen ? <Shrink size={18} /> : <Expand size={18} />}</button>
           <button className={`icon-btn ${settingsOpen ? 'active' : ''}`} onClick={() => setSettingsOpen(!settingsOpen)} title="Настройки"><Settings2 size={18} /></button>
         </div>
       </header>
@@ -272,7 +342,7 @@ export default function ReaderPage() {
         </main>
       </div>
 
-      <ReaderSettingsPanel open={settingsOpen} settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} />
+      <ReaderSettingsPanel open={settingsOpen} settings={settings} onChange={applySettings} onClose={() => setSettingsOpen(false)} />
       <SpeechPanel key={`${id}-${chapterIndex}`} open={speechOpen} title={chapter.title} contentRef={contentRef} onClose={() => setSpeechOpen(false)} onOpen={openSpeech} onPickStart={pickSpeechStart} />
 
       <nav className="reader-mobile-nav mobile-only">
@@ -281,6 +351,7 @@ export default function ReaderPage() {
         <button onClick={() => setSpeechOpen(true)}><Volume2 size={18} /><span>Диктор</span></button>
         <button onClick={() => { setSideTab('search'); setSideOpen(true) }}><Search size={18} /><span>Поиск</span></button>
         <button onClick={() => setSettingsOpen(true)}><Settings2 size={18} /><span>Текст</span></button>
+        <button onClick={toggleFullscreen} disabled={fullscreenBusy} aria-pressed={isFullscreen} aria-label={isFullscreen ? 'Выйти из полноэкранного режима' : 'На весь экран'}>{isFullscreen ? <Shrink size={18} /> : <Expand size={18} />}<span>{isFullscreen ? 'Свернуть' : 'Весь экран'}</span></button>
       </nav>
 
       {(sideOpen || settingsOpen || speechOpen) && <button className="panel-scrim" onClick={() => { setSideOpen(false); setSettingsOpen(false); setSpeechOpen(false) }} aria-label="Закрыть панель" />}

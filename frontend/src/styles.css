@@ -140,7 +140,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   --reader-border: rgba(50,46,39,.11); --reader-ui: rgba(250,248,242,.88); --reader-hover: rgba(70,64,56,.07); --reader-accent: #4d725f;
 }
 .reader-shell {
-  height: 100vh; overflow: hidden; background: var(--reader-bg); color: var(--reader-ink); transition: background .25s ease, color .25s ease;
+  position: relative; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; background: var(--reader-bg); color: var(--reader-ink); transition: background .25s ease, color .25s ease;
 }
 .theme-ivory { --reader-bg: #ece8dc; --reader-page: #fffdf5; --reader-ink: #292823; --reader-muted: #817c71; --reader-border: rgba(55,50,42,.1); --reader-ui: rgba(250,248,241,.92); --reader-hover: rgba(60,57,50,.07); --reader-accent: #4e7464; }
 .theme-sepia { --reader-bg: #d9cbb4; --reader-page: #eee2cb; --reader-ink: #4b3c2e; --reader-muted: #887461; --reader-border: rgba(81,59,38,.13); --reader-ui: rgba(231,218,194,.93); --reader-hover: rgba(95,72,45,.08); --reader-accent: #806143; }
@@ -265,7 +265,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .toggle.on i { transform: translateX(18px); }
 .panel-scrim { position: fixed; inset: 0; z-index: 55; border: 0; background: rgba(10,10,10,.18); cursor: default; }
 .focus-mode .reader-topbar { transform: translateY(-100%); opacity: 0; pointer-events: none; }
-.focus-mode .reader-body { height: 100vh; margin-top: -58px; padding-top: 58px; }
 .focus-mode .side-rail { opacity: 0; pointer-events: none; transform: translateX(-14px); }
 .focus-mode .reader-mobile-nav { opacity: 0; pointer-events: none; transform: translateY(110%); }
 .reader-loading, .reader-error { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px; background: var(--reader-bg, var(--app-bg)); color: var(--reader-ink, var(--app-text)); text-align: center; padding: 30px; }
@@ -317,7 +316,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   .nav-panel { width: min(360px, 94vw); }
   .side-content { height: calc(100% - 142px - env(safe-area-inset-bottom)); }
   .settings-scroll { padding-bottom: calc(30px + env(safe-area-inset-bottom)); }
-  .focus-mode .reader-body { height: 100vh; margin-top: -54px; padding-top: 54px; }
 }
 
 @media (max-width: 480px) {
@@ -569,14 +567,14 @@ body { background: var(--app-bg); color: var(--app-text); }
 .markdown-body .katex-display > .katex { min-width: max-content; text-align: center; }
 .chapter-text.align-justify .markdown-body p { text-align: justify; hyphens: auto; }
 
-.focus-exit {
+.focus-exit, .fullscreen-exit {
   position: fixed; z-index: 78; top: 14px; right: 16px; min-height: 38px; padding: 0 9px 0 12px;
   display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--reader-border); border-radius: 999px;
   background: color-mix(in srgb, var(--reader-ui) 88%, transparent); color: var(--reader-ink); box-shadow: 0 12px 36px rgba(0,0,0,.12);
   backdrop-filter: blur(22px) saturate(140%); cursor: pointer; opacity: .74; transition: opacity .18s ease, transform .18s ease, background .18s ease;
 }
-.focus-exit:hover { opacity: 1; transform: translateY(-1px); background: var(--reader-ui); }
-.focus-exit span { font-size: 10px; font-weight: 800; letter-spacing: .01em; }
+.focus-exit:hover, .fullscreen-exit:hover { opacity: 1; transform: translateY(-1px); background: var(--reader-ui); }
+.focus-exit span, .fullscreen-exit span { font-size: 12px; font-weight: 750; }
 .focus-exit kbd { min-width: 22px; height: 22px; padding: 0 6px; display: grid; place-items: center; border: 1px solid var(--reader-border); border-radius: 7px; background: var(--reader-hover); color: var(--reader-muted); font: 700 9px/1 ui-monospace, monospace; }
 
 /* Liquid Glass is deliberately more pronounced than the ordinary Glass preset. */
@@ -646,7 +644,8 @@ body { background: var(--app-bg); color: var(--app-text); }
 :root[data-ui-style="liquid"] .speech-panel,
 :root[data-ui-style="liquid"] .side-rail,
 :root[data-ui-style="liquid"] .reader-mobile-nav,
-:root[data-ui-style="liquid"] .focus-exit {
+:root[data-ui-style="liquid"] .focus-exit,
+:root[data-ui-style="liquid"] .fullscreen-exit {
   background: linear-gradient(135deg, color-mix(in srgb, white 11%, transparent), transparent 55%), color-mix(in srgb, var(--reader-ui) 72%, transparent);
   border-color: color-mix(in srgb, white 20%, var(--reader-border));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 16px 42px rgba(0,0,0,.12);
@@ -667,8 +666,7 @@ body { background: var(--app-bg); color: var(--app-text); }
   :root[data-ui-style="liquid"] .reading-page::before { inset-inline: -16px; border-radius: 24px; }
 }
 @media (max-width: 480px) {
-  .focus-exit span { display: none; }
-  .focus-exit { width: 38px; padding: 0; justify-content: center; }
+  .focus-exit kbd { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   :root[data-ui-style="liquid"] .library-shell::before,
@@ -695,11 +693,14 @@ body { background: var(--app-bg); color: var(--app-text); }
 .appearance-style-cycle { width: auto; min-width: 118px; padding: 0 11px; }
 .appearance-style-cycle span { display: inline; font-size: 11px; font-weight: 750; white-space: nowrap; }
 .style-popover {
-  position: absolute; z-index: 120; right: 0; top: calc(100% + 10px); width: 285px; padding: 9px;
+  position: fixed; z-index: 200; width: 285px; max-width: calc(100vw - 28px); padding: 9px; overflow-y: auto; overscroll-behavior: contain;
   border: 1px solid var(--app-line); border-radius: 18px; background: color-mix(in srgb, var(--app-surface-solid) 92%, transparent);
   box-shadow: 0 22px 60px rgba(18,24,32,.19); backdrop-filter: blur(30px) saturate(160%);
 }
 .style-popover-head { display: flex; align-items: center; gap: 7px; padding: 8px 9px 10px; color: var(--app-muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.style-popover-head > span { flex: 1; }
+.style-popover-close { display: grid; place-items: center; flex: 0 0 36px; height: 36px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: inherit; cursor: pointer; }
+.style-popover-close:hover { background: var(--app-hover); }
 .style-popover > button { width: 100%; border: 0; border-radius: 13px; background: transparent; color: var(--app-text); padding: 10px; display: grid; grid-template-columns: 28px 1fr; gap: 8px; align-items: center; text-align: left; cursor: pointer; }
 .style-popover > button:hover, .style-popover > button.active { background: var(--app-hover); }
 .style-popover > button > svg { color: var(--app-accent); }
@@ -818,7 +819,6 @@ body { background: var(--app-bg); color: var(--app-text); }
 @media (max-width: 780px) {
   .appearance-style-cycle { min-width: 36px; width: 36px; padding: 0; }
   .appearance-style-cycle span { display: none; }
-  .style-popover { right: -44px; width: min(285px, calc(100vw - 28px)); }
   :root[data-ui-style="glass"] .library-main,
   :root[data-ui-style="liquid"] .library-main,
   :root[data-ui-style="minimal"] .library-main { width: min(100% - 28px,760px); }
@@ -847,5 +847,35 @@ body { background: var(--app-bg); color: var(--app-text); }
 @media (max-width: 520px) {
   .appearance-control.compact { display: flex; }
   .appearance-control.compact > .appearance-group { display: none; }
-  .style-popover { right: 0; }
+}
+
+/* Let the reader follow the visible mobile viewport, including browser bars. */
+.reader-topbar { flex-shrink: 0; }
+.reader-top-left .icon-btn, .reader-actions .icon-btn { flex-shrink: 0; }
+.reader-title-block { flex: 1; }
+:root[data-ui-style] .reader-body { flex: 1; min-height: 0; height: auto; }
+:root[data-ui-style] .reading-page { min-height: 100%; }
+.reader-shell:is(.focus-mode, .expanded-mode) .reader-topbar { display: none; }
+.reader-shell:is(.focus-mode, .expanded-mode) .side-rail { display: none; }
+.reader-shell:is(.focus-mode, .expanded-mode) .reader-mobile-nav { display: none !important; }
+:root[data-ui-style] .reader-shell:is(.focus-mode, .expanded-mode) .reader-body { margin: 0; padding-top: 0; }
+.reader-exit-controls { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); z-index: 80; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)); pointer-events: none; }
+.reader-exit-controls .focus-exit, .reader-exit-controls .fullscreen-exit { position: static; min-height: 44px; max-width: 100%; padding: 0 14px; opacity: 1; pointer-events: auto; }
+.reader-display-error { position: fixed; z-index: 81; bottom: calc(84px + env(safe-area-inset-bottom)); left: 16px; right: 16px; max-width: 480px; margin: 0 auto; padding: 14px; border: 1px solid var(--reader-border); border-radius: 12px; background: var(--reader-page); color: var(--reader-ink); font-size: 13px; }
+.appearance-control, .appearance-style-row, .appearance-group { min-width: 0; }
+.appearance-group.style-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.appearance-group button { min-width: 0; }
+
+@media (max-width: 780px) {
+  :root[data-ui-style] .reader-body { margin-bottom: calc(58px + env(safe-area-inset-bottom)); }
+  .reader-topbar { padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+  :root[data-ui-style="liquid"] .reader-topbar { top: calc(8px + env(safe-area-inset-top)); }
+  :root[data-ui-style="liquid"] .reader-body { padding-top: calc(72px + env(safe-area-inset-top)); }
+  :root[data-ui-style="glass"] .reader-topbar { margin-top: calc(8px + env(safe-area-inset-top)); }
+  :root[data-ui-style="soft"] .reader-topbar, :root[data-ui-style="minimal"] .reader-topbar { height: calc(54px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
+  .reader-mobile-nav { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .reader-mobile-nav button { min-height: 44px; }
+  .style-popover > button { min-height: 52px; }
+  .appearance-group.style-choices button { min-height: 44px; padding: 7px; flex-wrap: wrap; }
+  .fullscreen-toggle { display: inline-grid; }
 }
