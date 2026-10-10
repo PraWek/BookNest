@@ -135,9 +135,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .form-field input:focus { border-color: #6b9384; box-shadow: 0 0 0 3px rgba(78,116,101,.1); }
 
 /* Reader themes and shell */
-.reader-shell {
+.reader-shell, .theme-paper {
   --reader-bg: #f4efe5; --reader-page: #fbf8f0; --reader-ink: #2f2c27; --reader-muted: #8f887d;
   --reader-border: rgba(50,46,39,.11); --reader-ui: rgba(250,248,242,.88); --reader-hover: rgba(70,64,56,.07); --reader-accent: #4d725f;
+}
+.reader-shell {
   height: 100vh; overflow: hidden; background: var(--reader-bg); color: var(--reader-ink); transition: background .25s ease, color .25s ease;
 }
 .theme-ivory { --reader-bg: #ece8dc; --reader-page: #fffdf5; --reader-ink: #292823; --reader-muted: #817c71; --reader-border: rgba(55,50,42,.1); --reader-ui: rgba(250,248,241,.92); --reader-hover: rgba(60,57,50,.07); --reader-accent: #4e7464; }
@@ -266,7 +268,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .focus-mode .reader-body { height: 100vh; margin-top: -58px; padding-top: 58px; }
 .focus-mode .side-rail { opacity: 0; pointer-events: none; transform: translateX(-14px); }
 .focus-mode .reader-mobile-nav { opacity: 0; pointer-events: none; transform: translateY(110%); }
-.reader-loading, .reader-error { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px; background: #f4efe5; text-align: center; padding: 30px; }
+.reader-loading, .reader-error { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px; background: var(--reader-bg, var(--app-bg)); color: var(--reader-ink, var(--app-text)); text-align: center; padding: 30px; }
 .reader-error h2 { margin: 6px 0 0; font: 500 28px Georgia, serif; }
 .reader-error p { margin: 0 0 8px; color: #807a70; }
 .reader-mobile-nav { display: none; }
@@ -369,6 +371,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 }
 
 body { background: var(--app-bg); color: var(--app-text); }
+.app-loading { min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; background: var(--reader-bg, var(--app-bg)); color: var(--reader-muted, var(--app-muted)); font-size: 14px; }
+.loading-spinner { width: 28px; height: 28px; border: 2px solid color-mix(in srgb, currentColor 16%, transparent); border-top-color: currentColor; border-radius: 50%; animation: spin .8s linear infinite; }
+:root[data-ui-style="liquid"] .app-loading, :root[data-ui-style="liquid"] .boot-loading {
+  background: radial-gradient(circle at 15% 20%, rgba(126,216,255,.12), transparent 36%), radial-gradient(circle at 85% 75%, rgba(167,124,255,.12), transparent 36%), var(--reader-bg, var(--boot-bg, var(--app-bg)));
+}
+@media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }
 .library-shell {
   color: var(--app-text);
   background:
@@ -673,7 +681,7 @@ body { background: var(--app-bg); color: var(--app-text); }
   background: color-mix(in srgb, var(--app-surface-solid) 72%, transparent); color: var(--app-muted); cursor: pointer; transition: .18s ease;
 }
 .appearance-style-cycle:hover { color: var(--app-text); background: var(--app-hover); transform: translateY(-1px); }
-.appearance-style-cycle.style-liquid { color: var(--app-accent); box-shadow: inset 0 1px 0 rgba(255,255,255,.26), 0 6px 20px rgba(41,92,110,.12); }
+.appearance-style-cycle.style-liquid { color: var(--app-text); box-shadow: inset 0 1px 0 rgba(255,255,255,.26), 0 6px 20px rgba(41,92,110,.12); }
 :root[data-ui-style="liquid"] .appearance-style-cycle { border-color: color-mix(in srgb, white 30%, var(--app-line)); background: color-mix(in srgb, var(--app-surface-solid) 44%, transparent); backdrop-filter: blur(18px) saturate(160%); }
 @media (max-width: 780px) { .appearance-style-cycle { width: 33px; height: 33px; flex-basis: 33px; } }
 
@@ -695,6 +703,7 @@ body { background: var(--app-bg); color: var(--app-text); }
 .style-popover > button { width: 100%; border: 0; border-radius: 13px; background: transparent; color: var(--app-text); padding: 10px; display: grid; grid-template-columns: 28px 1fr; gap: 8px; align-items: center; text-align: left; cursor: pointer; }
 .style-popover > button:hover, .style-popover > button.active { background: var(--app-hover); }
 .style-popover > button > svg { color: var(--app-accent); }
+.style-popover > button.style-liquid > svg { color: inherit; }
 .style-popover strong, .style-popover small { display: block; }
 .style-popover strong { font-size: 12px; }
 .style-popover small { margin-top: 2px; color: var(--app-muted); font-size: 9px; font-weight: 500; }

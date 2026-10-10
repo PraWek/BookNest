@@ -38,7 +38,7 @@ export default function AppearanceControl({ compact = false }: { compact?: boole
             <div className="style-popover">
               <div className="style-popover-head"><Palette size={14} /><span>Оформление страницы</span></div>
               {STYLE_ORDER.map((item) => (
-                <button key={item} className={style === item ? 'active' : ''} onClick={() => { setStyle(item); setMenuOpen(false) }}>
+                <button key={item} className={`style-${item} ${style === item ? 'active' : ''}`} aria-pressed={style === item} onClick={() => { setStyle(item); setMenuOpen(false) }}>
                   <StyleIcon style={item} /><span><strong>{STYLE_NAMES[item]}</strong><small>{item === 'soft' ? 'Классическая книжная сетка' : item === 'glass' ? 'Карточки и матовое стекло' : item === 'liquid' ? 'Плавающее жидкое стекло' : 'Чистый список без декора'}</small></span>
                 </button>
               ))}
@@ -49,7 +49,7 @@ export default function AppearanceControl({ compact = false }: { compact?: boole
         <div className="appearance-style-row">
           <span><Palette size={14} /> Оформление</span>
           <div className="appearance-group style-choices">
-            {STYLE_ORDER.map((item) => <button key={item} className={style === item ? 'active' : ''} onClick={() => setStyle(item)}><StyleIcon style={item} /> {STYLE_NAMES[item]}</button>)}
+            {STYLE_ORDER.map((item) => <button key={item} className={`style-${item} ${style === item ? 'active' : ''}`} aria-pressed={style === item} onClick={() => setStyle(item)}><StyleIcon style={item} /> {STYLE_NAMES[item]}</button>)}
           </div>
         </div>
       )}

@@ -4,11 +4,40 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#171613" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="description" content="BookNest — аккуратная личная библиотека и веб-читалка." />
     <title>BookNest</title>
+    <script>
+      (() => {
+        const root = document.documentElement
+        let theme = 'system', style = 'liquid', readerTheme = null
+        try {
+          theme = localStorage.getItem('booknest-ui-theme') || theme
+          style = localStorage.getItem('booknest-ui-style') || style
+          readerTheme = localStorage.getItem('booknest-reader-theme')
+        } catch {}
+        const dark = theme === 'dark' || (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+        root.dataset.uiTheme = ['light', 'dark', 'system'].includes(theme) ? theme : 'system'
+        root.dataset.uiStyle = ['soft', 'glass', 'liquid', 'minimal'].includes(style) ? style : 'liquid'
+        root.dataset.resolvedTheme = dark ? 'dark' : 'light'
+        root.style.colorScheme = dark ? 'dark' : 'light'
+        const pages = { paper: ['#f4efe5', '#2f2c27'], ivory: ['#ece8dc', '#292823'], sepia: ['#d9cbb4', '#4b3c2e'], night: ['#1b1c1b', '#d9d7d0'], midnight: ['#111821', '#d6dce1'] }
+        const colors = location.pathname.startsWith('/read/') ? pages[readerTheme] || pages[dark ? 'night' : 'paper'] : dark ? ['#0f1216', '#edf0f3'] : ['#f4f5f7', '#171a1f']
+        root.style.setProperty('--boot-bg', colors[0])
+        root.style.setProperty('--boot-ink', colors[1])
+        document.querySelector('meta[name="theme-color"]').content = colors[0]
+      })()
+    </script>
+    <style>
+      html, body { margin: 0; background: var(--boot-bg); color: var(--boot-ink); }
+      .boot-loading { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 18px; background: var(--boot-bg); font: 14px system-ui, sans-serif; }
+      .boot-spinner { width: 28px; height: 28px; border: 2px solid color-mix(in srgb, var(--boot-ink) 16%, transparent); border-top-color: var(--boot-ink); border-radius: 50%; animation: boot-spin .8s linear infinite; }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .boot-spinner { animation: none; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot-loading" role="status" aria-label="Загрузка BookNest"><span class="boot-spinner" aria-hidden="true"></span></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

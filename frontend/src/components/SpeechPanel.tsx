@@ -2,12 +2,30 @@ import { Pause, Play, RotateCcw, Sparkles, Volume2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { api } from '../lib/api'
-import { alignSpeechBoundaries, collectSpeechChunks, firstVisibleSpeechElement, narrationBlob, speechWordAt } from '../lib/speech'
+import { alignSpeechBoundaries, collectSpeechChunks, firstVisibleSpeechElement, NarrationBuffer, speechWordAt } from '../lib/speech'
 import type { TimedSpeechWord } from '../lib/speech'
 import type { TtsVoice } from '../lib/types'
 
 type SpeechStatus = 'idle' | 'loading' | 'speaking' | 'paused'
 type StartMode = 'beginning' | 'visible' | 'selected'
+type PreparedAudio = { audio: HTMLAudioElement; url: string }
+const FIRST_CHUNK_LENGTH = 240
+
+function prepareAudio(blob: Blob): PreparedAudio {
+  const url = URL.createObjectURL(blob)
+  const audio = new Audio()
+  audio.preload = 'auto'
+  audio.src = url
+  audio.load()
+  return { audio, url }
+}
+
+function releaseAudio({ audio, url }: PreparedAudio) {
+  audio.pause()
+  audio.removeAttribute('src')
+  audio.load()
+  URL.revokeObjectURL(url)
+}
 
 export default function SpeechPanel({ open, title, contentRef, onClose, onOpen, onPickStart }: {
   open: boolean
@@ -43,6 +61,9 @@ export default function SpeechPanel({ open, title, contentRef, onClose, onOpen, 
   const highlightedRef = useRef<HTMLElement[]>([])
   const highlightEnabledRef = useRef(highlightEnabled)
   const rateRef = useRef(rate)
+  const bufferRef = useRef<NarrationBuffer | null>(null)
+  if (!bufferRef.current) bufferRef.current = new NarrationBuffer((text, voice, signal) => api.ttsNarration(text, voice, 1, signal))
+  const preparedRef = useRef(new Set<PreparedAudio>())
 
   const selectedVoice = voices.find((voice) => voice.id === voiceId) || voices[0]
 
@@ -119,11 +140,14 @@ export default function SpeechPanel({ open, title, contentRef, onClose, onOpen, 
     }
   }
 
-  const cancelPlayback = () => {
+  const cancelPlayback = (preserveSynthesis = false) => {
     runRef.current += 1
     abortRef.current?.abort()
     abortRef.current = null
     clearAudio()
+    preparedRef.current.forEach(releaseAudio)
+    preparedRef.current.clear()
+    if (!preserveSynthesis) bufferRef.current?.cancelPending()
   }
 
   const stop = () => {
@@ -134,6 +158,16 @@ export default function SpeechPanel({ open, title, contentRef, onClose, onOpen, 
   }
 
   useEffect(() => () => cancelPlayback(), [])
+
+  useEffect(() => {
+    if (!open || status !== 'idle' || !selectedVoice || !contentRef.current) return
+    bufferRef.current!.cancelPending()
+    const from = startMode === 'visible' ? firstVisibleSpeechElement(contentRef.current) : startMode === 'selected' ? startElement : null
+    if (startMode !== 'beginning' && !from) return
+    const first = collectSpeechChunks(contentRef.current, 1250, from, FIRST_CHUNK_LENGTH, 1)[0]
+    // Opening the narrator gives the first short fragment a head start.
+    if (first) void bufferRef.current!.load(first.text, selectedVoice.id).catch(() => undefined)
+  }, [open, selectedVoice?.id, startMode, startElement, contentRef])
 
   useEffect(() => {
     const root = contentRef.current
@@ -148,7 +182,7 @@ export default function SpeechPanel({ open, title, contentRef, onClose, onOpen, 
       if (event instanceof KeyboardEvent && event.key !== 'Enter' && event.key !== ' ') return
       const element = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-speech-word], .katex') : null
       if (!element || !root.contains(element)) return
-      const chunks = collectSpeechChunks(root, 1250, element)
+      const chunks = collectSpeechChunks(root, 1250, element, 1250, 1)
       if (!chunks.length) return
       event.preventDefault()
       event.stopPropagation()
@@ -181,19 +215,19 @@ export default function SpeechPanel({ open, title, contentRef, onClose, onOpen, 
     }
   }, [picking, contentRef, onOpen])
 
-  const playBlob = async (blob: Blob, token: number, words: TimedSpeechWord[] = [], onProgress?: (fraction: number) => void) => {
+  const playAudio = async (prepared: PreparedAudio, token: number, words: TimedSpeechWord[] = [], onProgress?: (fraction: number) => void) => {
     if (token !== runRef.current) return
     clearAudio()
     wordsRef.current = words
-    const url = URL.createObjectURL(blob)
+    const { audio, url } = prepared
+    preparedRef.current.delete(prepared)
     objectUrlRef.current = url
-    const audio = new Audio(url)
     audio.playbackRate = rateRef.current
     audio.preservesPitch = true
     audioRef.current = audio
     await new Promise<void>((resolve, reject) => {
       finishCurrentRef.current = resolve
-      audio.onplaying = followAudio
+      audio.onplaying = () => { setStatus('speaking'); followAudio() }
       audio.onpause = () => { cancelFrame(); syncHighlight() }
       audio.onseeked = syncHighlight
       audio.ontimeupdate = () => {
@@ -214,34 +248,52 @@ export default function SpeechPanel({ open, title, contentRef, onClose, onOpen, 
       setError('Прокрутите страницу к нужному тексту или выберите слово для начала чтения.')
       return
     }
-    const chunks = collectSpeechChunks(contentRef.current, 1250, from)
+    const chunks = collectSpeechChunks(contentRef.current, 1250, from, FIRST_CHUNK_LENGTH)
     if (!chunks.length) { setError('Выберите другое слово для начала чтения.'); return }
-    stop()
+    cancelPlayback(true)
+    setProgress(0)
+    setPreviewing(false)
     const token = runRef.current
     setError('')
+    setStatus('loading')
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.text.length, 0)
+    let completedLength = 0
+    const pending = new Map<number, Promise<{ prepared: PreparedAudio; words: TimedSpeechWord[] }>>()
+    const prepare = (index: number) => {
+      if (index >= chunks.length || pending.has(index)) return
+      const chunk = chunks[index]
+      const promise = bufferRef.current!.load(chunk.text, selectedVoice.id).then((narration) => {
+        if (token !== runRef.current) throw new DOMException('Playback cancelled', 'AbortError')
+        const prepared = prepareAudio(narration.blob)
+        preparedRef.current.add(prepared)
+        return { prepared, words: alignSpeechBoundaries(chunk, narration.boundaries) }
+      })
+      void promise.catch(() => undefined)
+      pending.set(index, promise)
+    }
     try {
+      prepare(0)
+      prepare(1)
       for (let index = 0; index < chunks.length; index += 1) {
         if (token !== runRef.current) return
         setStatus('loading')
-        setProgress(Math.round((index / chunks.length) * 100))
-        const controller = new AbortController()
-        abortRef.current = controller
         const chunk = chunks[index]
-        // Generate at normal speed so timestamps always use the audio timeline.
-        // HTML Audio applies the live rate, including changes during synthesis.
-        const narration = await api.ttsNarration(chunk.text, selectedVoice.id, 1, controller.signal)
+        const { prepared, words } = await pending.get(index)!
+        pending.delete(index)
         if (token !== runRef.current) return
-        if (!narration.boundaries.length) setError('Сервис не вернул метки слов. Чтение продолжится без подсветки.')
-        setStatus('speaking')
-        await playBlob(narrationBlob(narration.audio), token, alignSpeechBoundaries(chunk, narration.boundaries),
-          (fraction) => setProgress(Math.round(((index + fraction) / chunks.length) * 100)))
+        // Keep two fragments synthesized and preloaded ahead of playback.
+        prepare(index + 2)
+        if (!words.length) setError('Сервис не вернул метки слов. Чтение продолжится без подсветки.')
+        await playAudio(prepared, token, words,
+          (fraction) => setProgress(Math.round(((completedLength + fraction * chunk.text.length) / totalLength) * 100)))
         if (token !== runRef.current) return
-        setProgress(Math.round(((index + 1) / chunks.length) * 100))
+        completedLength += chunk.text.length
+        setProgress(Math.round((completedLength / totalLength) * 100))
       }
       if (token === runRef.current) setStatus('idle')
     } catch (e) {
       if (token !== runRef.current) return
-      clearAudio()
+      cancelPlayback()
       setStatus('idle')
       setError(e instanceof Error ? e.message : 'Не удалось запустить озвучивание')
     } finally {
@@ -276,7 +328,7 @@ export default function SpeechPanel({ open, title, contentRef, onClose, onOpen, 
       const blob = await api.ttsAudio(phrase, selectedVoice.id, 1, controller.signal)
       if (token !== runRef.current) return
       setStatus('speaking')
-      await playBlob(blob, token)
+      await playAudio(prepareAudio(blob), token)
       if (token === runRef.current) setStatus('idle')
     } catch (e) {
       if (token !== runRef.current) return

@@ -8,9 +8,11 @@ import ReaderSettingsPanel from '../components/ReaderSettingsPanel'
 import MarkdownChapter from '../components/MarkdownChapter'
 import SpeechPanel from '../components/SpeechPanel'
 import SpeechText from '../components/SpeechText'
+import LoadingScreen from '../components/LoadingScreen'
 import { api } from '../lib/api'
 import type { Bookmark, BookDetail, ReaderSettings } from '../lib/types'
 import { estimateMinutes, formatDuration, progressPercent, splitParagraphs } from '../lib/text'
+import { saveReaderTheme, storedReaderTheme } from '../lib/readerTheme'
 
 const DEFAULT_SETTINGS: ReaderSettings = {
   theme: 'paper', fontFamily: 'literata', fontSize: 19, lineHeight: 1.75,
@@ -31,7 +33,7 @@ export default function ReaderPage() {
   const [book, setBook] = useState<BookDetail | null>(null)
   const [chapterIndex, setChapterIndex] = useState(0)
   const [scrollPercent, setScrollPercent] = useState(0)
-  const [settings, setSettings] = useState<ReaderSettings>(DEFAULT_SETTINGS)
+  const [settings, setSettings] = useState<ReaderSettings>(() => ({ ...DEFAULT_SETTINGS, theme: storedReaderTheme() }))
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sideOpen, setSideOpen] = useState(false)
   const [sideTab, setSideTab] = useState<SideTab>('contents')
@@ -75,6 +77,7 @@ export default function ReaderPage() {
 
   useEffect(() => {
     if (loading) return
+    saveReaderTheme(settings.theme)
     const timer = window.setTimeout(() => api.savePreferences(settings).catch(() => undefined), 450)
     return () => clearTimeout(timer)
   }, [settings, loading])
@@ -163,9 +166,9 @@ export default function ReaderPage() {
     setBookmarks((prev) => [mark, ...prev])
   }
 
-  if (loading) return <div className="reader-loading"><div className="brand-mark"><BookOpen size={20} /></div><span className="spinner large" /></div>
+  if (loading) return <LoadingScreen readerTheme={settings.theme} />
   if (error || !book || !chapter) return (
-    <div className="reader-error"><BookOpen size={34} /><h2>Не удалось открыть книгу</h2><p>{error || 'Книга не найдена'}</p><button className="btn primary" onClick={() => navigate('/')}>В библиотеку</button></div>
+    <div className={`reader-error theme-${settings.theme}`}><BookOpen size={34} /><h2>Не удалось открыть книгу</h2><p>{error || 'Книга не найдена'}</p><button className="btn primary" onClick={() => navigate('/')}>В библиотеку</button></div>
   )
 
   const readerVars = {

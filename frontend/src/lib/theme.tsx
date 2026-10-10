@@ -39,6 +39,7 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
     const syncSystem = () => {
       root.dataset.resolvedTheme = theme === 'system' ? (media.matches ? 'dark' : 'light') : theme
       root.style.colorScheme = root.dataset.resolvedTheme
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', root.dataset.resolvedTheme === 'dark' ? '#0f1216' : '#f4f5f7')
     }
     syncSystem()
     media.addEventListener?.('change', syncSystem)
